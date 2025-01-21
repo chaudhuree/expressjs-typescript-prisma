@@ -1,7 +1,8 @@
 import { User } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import prisma from '../../utils/prisma';
-
+import AppError from '../../errors/AppError';
+import httpStatus from 'http-status';
 
 interface UserWithOptionalPassword extends Omit<User, 'password'> {
   password?: string;
@@ -16,6 +17,13 @@ const registerUserIntoDB = async (payload: any) => {
     email: payload.email,
     password: hashedPassword,
   };
+  // check if user already exists
+  const isUserExists = await prisma.user.findUnique({
+    where: { email: payload.email }
+  });
+  if (isUserExists) {
+    throw new AppError(httpStatus.BAD_REQUEST, 'User already exists');
+  }
 
   const result = await prisma.$transaction(async (transactionClient: any) => {
     const user = await transactionClient.user.create({
