@@ -14,4 +14,10 @@ export default {
     refresh_secret: process.env.JWT_REFRESH_SECRET,
     refresh_expires_in: process.env.JWT_REFRESH_EXPIRES_IN,
   },
+  digitalOcean: {
+    endpoint: process.env.DO_SPACE_ENDPOINT,
+    accessKeyId: process.env.DO_SPACE_ACCESS_KEY,
+    secretAccessKey: process.env.DO_SPACE_SECRET_KEY,
+    bucket: process.env.DO_SPACE_BUCKET,
+  },
 };
