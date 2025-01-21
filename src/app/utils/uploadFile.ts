@@ -12,13 +12,13 @@ const s3Client = new S3Client({
   },
 });
 
-interface UploadImageResponse {
+interface UploadFileResponse {
   success: boolean;
   url?: string;
   error?: string;
 }
 
-export const uploadImage = async (file: Express.Multer.File): Promise<UploadImageResponse> => {
+export const uploadFile = async (file: Express.Multer.File): Promise<UploadFileResponse> => {
   try {
     if (!file) {
       return { success: false, error: "No file provided" };
@@ -26,7 +26,7 @@ export const uploadImage = async (file: Express.Multer.File): Promise<UploadImag
 
     // Generate unique filename
     const fileExtension = file.originalname.split(".").pop();
-    const fileName = `images/${uuidv4()}.${fileExtension}`;
+    const fileName = `files/${uuidv4()}.${fileExtension}`;
 
     // Define the upload parameters
     const uploadParams: PutObjectCommandInput = {

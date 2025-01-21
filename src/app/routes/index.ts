@@ -3,7 +3,7 @@ import { AuthRoutes } from '../modules/auth/auth.routes';
 import { UserRouters } from '../modules/user/user.routes';
 // need to import below two to upload image -> upload is the middleware
 // uploadImage is the function
-import { uploadImage } from '../utils/uploadImage';
+import { uploadFile } from '../utils/uploadFile';
 import { upload } from '../middlewares/upload';
 
 const router: Router = express.Router();
@@ -35,7 +35,7 @@ moduleRoutes.forEach(route => router.use(route.path, route.route));
  */
 router.post("/upload", upload.single("image"), (req: Request, res: Response) => {
   if (req.file) {
-    const result = uploadImage(req.file);
+    const result = uploadFile(req.file);
     result.then((response) => {
       if (response.success) {
         return res.status(200).json(response);
