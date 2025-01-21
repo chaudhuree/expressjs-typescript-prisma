@@ -63,3 +63,6 @@
     email: vidixo9288@dfesc.com 
     password: vidixo9288
 ```
+
+## Documentation Link
+[Postman Documentation](https://documenter.getpostman.com/view/41108448/2sAYQamBKf)
