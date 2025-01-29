@@ -3,7 +3,6 @@ node_modules
 .env
 
 .vercel
-generate-module.ts
 
 # Build
 dist

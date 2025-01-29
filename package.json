@@ -8,7 +8,7 @@
     "dev": "ts-node-dev --respawn --transpile-only ./src/server.ts",
     "pm": "npx prisma migrate dev ",
     "pg": "npx prisma generate",
-    "generate-module": "ts-node generate-module.ts",
+    "generate-module": "ts-node src/app/utils/generate-module.ts",
     "build": "tsc",
     "lint:check": "eslint --ignore-path .eslintignore --ext .js,.ts .",
     "lint:fix": "eslint . --fix",

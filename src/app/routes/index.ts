@@ -21,7 +21,7 @@ const moduleRoutes: ModuleRoute[] = [
   {
     path: '/users',
     route: UserRouters,
-  },
+  }
 ];
 
 moduleRoutes.forEach(route => router.use(route.path, route.route));

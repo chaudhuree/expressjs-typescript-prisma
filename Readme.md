@@ -66,3 +66,9 @@
 
 ## Documentation Link
 [Postman Documentation](https://documenter.getpostman.com/view/41108448/2sAYQamBKf)
+
+## Generate Module
+```bash
+    npx prisma generate
+    npm run generate-module [model-name]
+```
