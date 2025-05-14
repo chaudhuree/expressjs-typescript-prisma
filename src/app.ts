@@ -1,8 +1,12 @@
+import cookieParser from "cookie-parser";
 import cors from "cors";
 import express, { Application, NextFunction, Request, Response } from "express";
+import expressLayouts from "express-ejs-layouts";
 import httpStatus from "http-status";
+import path from "path";
 import globalErrorHandler from "./app/middlewares/globalErrorHandler";
 import router from "./app/routes";
+import { ViewRoutes } from "./app/routes/view.routes";
 
 const app: Application = express();
 app.use(
@@ -18,13 +22,28 @@ app.use(
 //parser
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
 
-app.get("/", (req: Request, res: Response) => {
+// Set up EJS as view engine
+app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, 'views'));
+app.use(expressLayouts);
+app.set('layout', 'layouts/main');
+
+// Serve static files
+app.use(express.static(path.join(__dirname, 'public')));
+
+// API health check route
+app.get("/api/health", (req: Request, res: Response) => {
   res.send({
     Message: "The server is running. . .",
   });
 });
 
+// View routes
+app.use("/", ViewRoutes);
+
+// API routes
 app.use("/api/v1", router);
 
 app.use(globalErrorHandler);

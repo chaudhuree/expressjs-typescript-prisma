@@ -1,0 +1,43 @@
+<div class="max-w-4xl mx-auto">
+    <div class="text-center mb-12">
+        <h1 class="text-4xl font-bold mb-4">Welcome to Auth System</h1>
+        <p class="text-xl text-gray-600">A complete authentication system with login, register, and password recovery</p>
+    </div>
+    
+    <% if (locals.user) { %>
+        <div class="bg-white shadow-md rounded-lg p-8 mb-8">
+            <h2 class="text-2xl font-bold mb-4">Welcome, <%= user.firstName %> <%= user.lastName %></h2>
+            <p class="mb-4">You are logged in as: <span class="font-semibold"><%= user.email %></span></p>
+            <p class="mb-4">Role: <span class="font-semibold"><%= user.role %></span></p>
+            
+            <div class="mt-6">
+                <a href="/auth/logout" class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700">Logout</a>
+            </div>
+        </div>
+    <% } else { %>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div class="bg-white shadow-md rounded-lg p-8">
+                <h2 class="text-2xl font-bold mb-4">Login</h2>
+                <p class="mb-6 text-gray-600">Already have an account? Sign in to access your dashboard.</p>
+                <a href="/auth/login" class="block w-full text-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">Go to Login</a>
+            </div>
+            
+            <div class="bg-white shadow-md rounded-lg p-8">
+                <h2 class="text-2xl font-bold mb-4">Register</h2>
+                <p class="mb-6 text-gray-600">New user? Create an account to get started.</p>
+                <a href="/auth/register" class="block w-full text-center px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">Go to Register</a>
+            </div>
+        </div>
+    <% } %>
+    
+    <div class="mt-12 bg-white shadow-md rounded-lg p-8">
+        <h2 class="text-2xl font-bold mb-4">Features</h2>
+        <ul class="list-disc pl-5 space-y-2">
+            <li>User registration with validation</li>
+            <li>Secure login with JWT authentication</li>
+            <li>Password reset via email</li>
+            <li>Role-based access control</li>
+            <li>User profile management</li>
+        </ul>
+    </div>
+</div>

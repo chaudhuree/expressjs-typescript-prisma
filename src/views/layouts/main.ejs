@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class'
+        }
+    </script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <header class="mb-8">
+            <nav class="flex justify-between items-center py-4">
+                <a href="/" class="text-2xl font-bold text-blue-600">Auth System</a>
+                <div class="space-x-4">
+                    <a href="/auth/login" class="text-gray-600 hover:text-blue-600">Login</a>
+                    <a href="/auth/register" class="text-gray-600 hover:text-blue-600">Register</a>
+                </div>
+            </nav>
+        </header>
+        
+        <main>
+            <%- body %>
+        </main>
+        
+        <footer class="mt-12 py-6 text-center text-gray-500">
+            <p>&copy; <%= new Date().getFullYear() %> Auth System. All rights reserved.</p>
+        </footer>
+    </div>
+</body>
+</html>
