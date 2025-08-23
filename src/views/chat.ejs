@@ -60,6 +60,7 @@
   let selectedUser = null; // chatting with
   let conversations = [];
   let users = [];
+  let isSearching = false;
 
   // Elements
   const conversationsEl = document.getElementById('conversations');
@@ -201,9 +202,21 @@
   }
   const doSearch = debounce(async () => {
     const q = searchInput.value.trim();
-    const list = await fetchUsers(q);
-    users = list; // keep global in sync
-    renderUsers(users);
+    isSearching = q.length > 0;
+    // fetch from server
+    let list = await fetchUsers(q);
+    // client-side fallback filter if backend ignores search
+    if (q) {
+      const ql = q.toLowerCase();
+      list = list.filter(u => ((u.firstName||'') + ' ' + (u.lastName||'') + ' ' + (u.email||'')).toLowerCase().includes(ql));
+    }
+    // Do not mutate full cache when searching, only render filtered results.
+    if (isSearching) {
+      renderUsers(list);
+    } else {
+      users = list;
+      renderUsers(users);
+    }
   }, 300);
   searchInput.addEventListener('input', doSearch);
 
@@ -266,6 +279,8 @@
 
       // Live users list updates
       const refreshUsers = async () => {
+        // If user is actively searching, don't override filtered results
+        if (isSearching) return;
         users = await fetchUsers('');
         renderUsers(users);
       };
