@@ -9,13 +9,7 @@ declare global {
         buffer: Buffer;
         size: number;
       };
-      user?: {
-        id: string;
-        firstName: string;
-        lastName: string;
-        email: string;
-        role: string;
-      };
+      user: import('../../app/interface/auth.interface').IDecodedUser;
     }
   }
 }
