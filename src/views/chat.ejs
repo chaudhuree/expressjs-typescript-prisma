@@ -1,0 +1,289 @@
+<% /* Chat Page - aligned with existing Tailwind layout */ %>
+<div class="grid grid-cols-12 gap-4">
+  <!-- Left panel: search + conversations + users -->
+  <div class="col-span-4 bg-white rounded-lg shadow p-4 flex flex-col h-[80vh]">
+    <div class="mb-4">
+      <h2 class="text-xl font-semibold">Chats</h2>
+    </div>
+
+    <div class="mb-3">
+      <input id="searchInput" type="text" placeholder="Search users by name or email" class="w-full border rounded px-3 py-2 focus:outline-none focus:ring" />
+    </div>
+
+    <div class="flex-1 overflow-hidden grid grid-rows-2 gap-3">
+      <!-- Conversations list -->
+      <div class="overflow-auto border rounded" id="conversations">
+        <!-- Filled by JS -->
+      </div>
+      <!-- Users search list -->
+      <div class="overflow-auto border rounded" id="users">
+        <!-- Filled by JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Right panel: messages -->
+  <div class="col-span-8 bg-white rounded-lg shadow h-[80vh] flex flex-col">
+    <div class="border-b p-4 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <div id="chatUserName" class="font-semibold">Select a chat</div>
+        <span id="chatUserPresence" class="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-600"></span>
+      </div>
+    </div>
+
+    <div id="messages" class="flex-1 p-4 overflow-auto space-y-2 bg-gray-50">
+      <!-- Messages here -->
+    </div>
+
+    <form id="messageForm" class="border-t p-3 flex gap-2">
+      <input id="messageInput" type="text" placeholder="Type a message" class="flex-1 border rounded px-3 py-2 focus:outline-none focus:ring" />
+      <button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700" type="submit">Send</button>
+    </form>
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+  if (typeof io === 'undefined') {
+    console.error('Socket.IO client failed to load. Check network/SRI.');
+  }
+  // Helpers
+  function getCookie(name){
+    const v = document.cookie.match('(^|;)\\s*'+name+'\\s*=\\s*([^;]+)');
+    return v ? v.pop() : '';
+  }
+  const accessToken = getCookie('accessToken');
+  const headers = accessToken ? { 'Authorization': accessToken, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' };
+
+  // State
+  let currentUser = null;
+  let selectedUser = null; // chatting with
+  let conversations = [];
+  let users = [];
+
+  // Elements
+  const conversationsEl = document.getElementById('conversations');
+  const usersEl = document.getElementById('users');
+  const searchInput = document.getElementById('searchInput');
+  const messagesEl = document.getElementById('messages');
+  const messageForm = document.getElementById('messageForm');
+  const messageInput = document.getElementById('messageInput');
+  const chatUserName = document.getElementById('chatUserName');
+  const chatUserPresence = document.getElementById('chatUserPresence');
+
+  // Renderers
+  function renderConversations(){
+    conversationsEl.innerHTML = '';
+    if(!conversations.length){
+      conversationsEl.innerHTML = '<div class="p-3 text-gray-500">No conversations yet</div>';
+      return;
+    }
+    conversations.forEach(item => {
+      const other = item.otherUser || {}; // { id, firstName, lastName, email, isOnline, lastSeen }
+      const el = document.createElement('button');
+      el.className = 'w-full text-left p-3 border-b hover:bg-gray-50 flex items-center justify-between';
+      const name = (other.firstName||'') + ' ' + (other.lastName||'');
+      el.innerHTML = `
+        <div>
+          <div class="font-medium">${name || other.email || 'Unknown'}</div>
+          <div class="text-xs text-gray-500">${item.lastMessage?.content ? item.lastMessage.content.slice(0,40) : ''}</div>
+        </div>
+        <div>
+          <span class="text-xs ${other.isOnline ? 'text-green-600' : 'text-gray-400'}">${other.isOnline ? 'Online' : 'Offline'}</span>
+        </div>`;
+      el.onclick = () => openChat(other);
+      conversationsEl.appendChild(el);
+    });
+  }
+
+  function renderUsers(list){
+    usersEl.innerHTML = '';
+    // Exclude self
+    const filtered = list.filter(u => !currentUser || u.id !== currentUser.id);
+    filtered.forEach(u => {
+      const el = document.createElement('button');
+      el.className = 'w-full text-left p-3 border-b hover:bg-gray-50 flex items-center justify-between';
+      const name = (u.firstName||'') + ' ' + (u.lastName||'');
+      el.innerHTML = `
+        <div>
+          <div class="font-medium">${name || u.email}</div>
+          <div class="text-xs text-gray-500">${u.email}</div>
+        </div>
+        <div>
+          <span class="text-xs ${u.isOnline ? 'text-green-600' : 'text-gray-400'}">${u.isOnline ? 'Online' : 'Offline'}</span>
+        </div>`;
+      el.onclick = () => openChat(u);
+      usersEl.appendChild(el);
+    });
+  }
+
+  function renderMessages(msgs){
+    messagesEl.innerHTML = '';
+    msgs.slice().reverse().forEach(m => {
+      const mine = m.senderId === currentUser?.id;
+      const row = document.createElement('div');
+      row.className = 'flex ' + (mine ? 'justify-end' : 'justify-start');
+      row.innerHTML = `
+        <div class="max-w-[70%] rounded px-3 py-2 ${mine ? 'bg-blue-600 text-white' : 'bg-white border'}">
+          <div class="text-sm">${m.content}</div>
+          <div class="text-[10px] opacity-70 mt-1">${new Date(m.createdAt).toLocaleTimeString()}</div>
+        </div>
+      `;
+      messagesEl.appendChild(row);
+    });
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  function setHeaderUser(u){
+    if(!u){
+      chatUserName.textContent = 'Select a chat';
+      chatUserPresence.textContent = '';
+      return;
+    }
+    const name = (u.firstName||'') + ' ' + (u.lastName||'');
+    chatUserName.textContent = name || u.email;
+    chatUserPresence.textContent = u.isOnline ? 'Online' : 'Offline';
+    chatUserPresence.className = 'text-xs px-2 py-0.5 rounded ' + (u.isOnline ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600');
+  }
+
+  // API
+  async function fetchMe(){
+    const res = await fetch('/api/v1/users/me', { headers });
+    if(res.ok) return res.json().then(r => r.data);
+    return null;
+  }
+  async function fetchUsers(){
+    const res = await fetch('/api/v1/users', { headers });
+    if(res.ok) return res.json().then(r => r.data);
+    return [];
+  }
+  async function fetchConversations(){
+    const res = await fetch('/api/v1/chat/conversations', { headers });
+    if(res.ok) return res.json().then(r => r.data);
+    return [];
+  }
+  async function fetchMessages(otherUserId){
+    const res = await fetch(`/api/v1/chat/messages/${otherUserId}`, { headers });
+    if(res.ok) return res.json().then(r => r.data);
+    return { messages: [] };
+  }
+  async function sendMessage(otherUserId, content){
+    return new Promise((resolve, reject) => {
+      const socket = window.__chatSocket;
+      if(!socket || socket.disconnected){
+        return reject(new Error('Socket not connected'));
+      }
+      socket.emit('message:send', { to: otherUserId, content }, (resp) => {
+        if(resp?.ok){ resolve(resp.message); }
+        else { reject(new Error(resp?.error || 'Failed to send')); }
+      });
+    });
+  }
+  async function markSeen(otherUserId){
+    await fetch(`/api/v1/chat/seen/${otherUserId}`, { method: 'POST', headers });
+  }
+
+  // Open chat
+  async function openChat(user){
+    selectedUser = user;
+    setHeaderUser(user);
+    const data = await fetchMessages(user.id);
+    renderMessages(data.messages || []);
+    await markSeen(user.id);
+  }
+
+  // Search
+  searchInput.addEventListener('input', () => {
+    const q = searchInput.value.toLowerCase();
+    const filtered = users.filter(u => (u.firstName+" "+u.lastName+" "+u.email).toLowerCase().includes(q));
+    renderUsers(filtered);
+  });
+
+  // Send message form
+  messageForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const content = messageInput.value.trim();
+    if(!content || !selectedUser) return;
+    try{
+      const msg = await sendMessage(selectedUser.id, content);
+      // clear input
+      messageInput.value = '';
+      // append to UI immediately
+      const row = document.createElement('div');
+      row.className = 'flex justify-end';
+      row.innerHTML = `<div class=\"max-w-[70%] rounded px-3 py-2 bg-blue-600 text-white\"><div class=\"text-sm\">${msg.content}</div><div class=\"text-[10px] opacity-70 mt-1\">${new Date(msg.createdAt).toLocaleTimeString()}</div></div>`;
+      messagesEl.appendChild(row);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    } catch(err){
+      alert('Failed to send message');
+    }
+  });
+
+  // Initialize
+  (async function init(){
+    // current user
+    currentUser = await fetchMe();
+    // users list
+    users = await fetchUsers();
+    renderUsers(users);
+    // conversations
+    conversations = await fetchConversations();
+    renderConversations();
+
+    // connect socket
+    {
+      // Same-origin socket; send cookies for auth
+      const socket = io({ withCredentials: true });
+      window.__chatSocket = socket;
+
+      socket.on('connect', () => console.log('[socket] connected', socket.id));
+      socket.on('connect_error', (err) => console.warn('[socket] connect_error', err?.message));
+      socket.on('disconnect', (reason) => console.log('[socket] disconnected', reason));
+
+      socket.on('message:new', async ({ message }) => {
+        // If the open chat matches the sender, append; otherwise refresh conversations
+        if (selectedUser && message.senderId === selectedUser.id) {
+          const row = document.createElement('div');
+          row.className = 'flex justify-start';
+          row.innerHTML = `<div class=\"max-w-[70%] rounded px-3 py-2 bg-white border\"><div class=\"text-sm\">${message.content}</div><div class=\"text-[10px] opacity-70 mt-1\">${new Date(message.createdAt).toLocaleTimeString()}</div></div>`;
+          messagesEl.appendChild(row);
+          messagesEl.scrollTop = messagesEl.scrollHeight;
+          // mark seen since we are viewing this chat
+          try { await markSeen(selectedUser.id); } catch(e) {}
+        } else {
+          // Refresh conversations so recipient sees latest in the inbox
+          try {
+            conversations = await fetchConversations();
+            renderConversations();
+          } catch (e) {}
+        }
+      });
+
+      socket.on('message:seen', ({ conversationId, seenBy }) => {
+        // Optionally, update UI to show seen receipts
+      });
+
+      socket.on('user:online', ({ userId }) => {
+        users = users.map(u => u.id === userId ? { ...u, isOnline: true } : u);
+        conversations = conversations.map(c => {
+          if(c.otherUser && c.otherUser.id === userId) c.otherUser.isOnline = true;
+          return c;
+        });
+        renderUsers(users);
+        renderConversations();
+        if(selectedUser && selectedUser.id === userId){ selectedUser.isOnline = true; setHeaderUser(selectedUser); }
+      });
+
+      socket.on('user:offline', ({ userId }) => {
+        users = users.map(u => u.id === userId ? { ...u, isOnline: false } : u);
+        conversations = conversations.map(c => {
+          if(c.otherUser && c.otherUser.id === userId) c.otherUser.isOnline = false;
+          return c;
+        });
+        renderUsers(users);
+        renderConversations();
+        if(selectedUser && selectedUser.id === userId){ selectedUser.isOnline = false; setHeaderUser(selectedUser); }
+      });
+    }
+  })();
+</script>

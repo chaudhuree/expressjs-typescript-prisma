@@ -9,14 +9,19 @@ import { verifyToken } from '../utils/verifyToken';
 const auth = (...roles: string[]) => {
   return async (req: Request, _res: Response, next: NextFunction) => {
     try {
-      const token = req.headers.authorization;
+      let token = (req.headers.authorization as string | undefined) || req.cookies?.accessToken;
 
       if (!token) {
         throw new AppError(httpStatus.UNAUTHORIZED, 'You are not authorized!');
       }
 
+      // Support 'Bearer <token>' format
+      if (typeof token === 'string' && token.startsWith('Bearer ')) {
+        token = token.slice('Bearer '.length).trim();
+      }
+
       const verifyUserToken = verifyToken(
-        token,
+        token as string,
         config.jwt.access_secret as Secret,
       );
 

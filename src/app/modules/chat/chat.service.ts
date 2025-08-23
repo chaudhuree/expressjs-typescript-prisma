@@ -10,9 +10,13 @@ export const ChatService = {
     });
 
     // For each conversation, fetch the other participant and last message
-    const enriched = await Promise.all(
+    const enrichedRaw = await Promise.all(
       conversations.map(async (c) => {
-        const otherUserId = c.participants.find((p) => p !== userId);
+        // Determine the other participant (skip malformed conversations)
+        const otherUserId = (c.participants || []).find((p) => p && p !== userId);
+        if (!otherUserId) {
+          return null;
+        }
         const [otherUser, lastMessage] = await Promise.all([
           prisma.user.findUnique({
             where: { id: otherUserId },
@@ -30,11 +34,12 @@ export const ChatService = {
             orderBy: { createdAt: "desc" },
           }),
         ]);
+        if (!otherUser) return null;
         return { conversation: c, otherUser, lastMessage };
       })
     );
 
-    return enriched;
+    return enrichedRaw.filter((x): x is NonNullable<typeof x> => Boolean(x));
   },
 
   async getOrCreateConversation(userA: string, userB: string) {
@@ -81,9 +86,10 @@ export const ChatService = {
       data: { lastMessageAt: msg.createdAt },
     });
 
-    // Emit to receiver's room
+    // Emit to both participants' rooms so inboxes update in realtime
     const io = getIO();
     io?.to(otherUserId).emit("message:new", { message: msg });
+    io?.to(currentUserId).emit("message:new", { message: msg });
 
     return msg;
   },

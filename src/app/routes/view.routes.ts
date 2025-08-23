@@ -27,6 +27,23 @@ router.get('/', (req: Request, res: Response) => {
   });
 });
 
+// Chat testing page
+router.get('/chat', (req: Request, res: Response) => {
+  const token = req.cookies?.accessToken;
+  let user = null;
+  if (token) {
+    try {
+      user = verifyToken(token);
+    } catch (e) {
+      // ignore
+    }
+  }
+  res.render('chat', {
+    title: 'Chat - Realtime',
+    user,
+  });
+});
+
 // Login page
 router.get('/auth/login', (req: Request, res: Response) => {
   res.render('login', { 
