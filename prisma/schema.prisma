@@ -23,6 +23,8 @@ model User {
   updatedAt    DateTime     @updatedAt
   profile      Profile?
   otp          String?
+  isOnline     Boolean      @default(false)
+  lastSeen     DateTime?
 
   @@map("users")
 }
@@ -36,6 +38,29 @@ model Profile {
   updatedAt        DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id])
+}
+
+model Conversation {
+  id             String     @id @default(auto()) @map("_id") @db.ObjectId
+  participants   String[]   @db.ObjectId
+  lastMessageAt  DateTime?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  messages       Message[]
+}
+
+model Message {
+  id             String       @id @default(auto()) @map("_id") @db.ObjectId
+  conversationId String       @db.ObjectId
+  senderId       String       @db.ObjectId
+  receiverId     String       @db.ObjectId
+  content        String
+  seen           Boolean      @default(false)
+  seenAt         DateTime?
+  createdAt      DateTime     @default(now())
+
+  conversation   Conversation @relation(fields: [conversationId], references: [id])
 }
 
 enum UserRoleEnum {

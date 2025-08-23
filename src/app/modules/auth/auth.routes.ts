@@ -2,6 +2,7 @@ import express from 'express';
 import validateRequest from '../../middlewares/validateRequest';
 import { AuthController } from './auth.controller';
 import { authValidation } from './auth.validation';
+import auth from '../../middlewares/auth';
 
 const router = express.Router();
 
@@ -24,3 +25,5 @@ router.post(
 );
 
 export const AuthRoutes = router;
+
+router.post('/logout', auth('USER', 'ADMIN'), AuthController.logout);

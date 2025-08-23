@@ -1,0 +1,7 @@
+- i want to make a chat system
+- in it user can chat with each other
+- it will show online/offline status of the users
+- it will have api to fetch all the previous chat list of users with other users
+- it will have api to send message to other users
+- it will have api to fetch all the users
+- it will have feature to seen message

@@ -9,6 +9,13 @@ declare global {
         buffer: Buffer;
         size: number;
       };
+      user?: {
+        id: string;
+        firstName: string;
+        lastName: string;
+        email: string;
+        role: string;
+      };
     }
   }
 }

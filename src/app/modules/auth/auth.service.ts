@@ -33,6 +33,12 @@ const loginUserFromDB = async (payload: {
     throw new AppError(httpStatus.BAD_REQUEST, 'Password incorrect');
   }
 
+  // mark user online
+  await prisma.user.update({
+    where: { id: userData.id },
+    data: { isOnline: true },
+  });
+
   const accessToken = await generateToken(
     {
       id: userData.id,
@@ -120,5 +126,12 @@ const resetPassword = async (email: string, otp: string, newPassword: string): P
 export const AuthServices = {
   loginUserFromDB,
   forgotPassword,
-  resetPassword
+  resetPassword,
+  logout: async (userId: string) => {
+    await prisma.user.update({
+      where: { id: userId },
+      data: { isOnline: false, lastSeen: new Date() },
+    });
+    return { message: 'Logged out' };
+  }
 };

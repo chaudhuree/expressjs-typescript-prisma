@@ -2,11 +2,15 @@ import { Server } from 'http';
 import app from './app';
 import seedSuperAdmin from './app/DB';
 import config from './config';
+import { createServer } from 'http';
+import { initSocket } from './app/socket';
 
 const port = config.port || 5000;
 
 async function main() {
-  const server: Server = app.listen(port, () => {
+  const httpServer: Server = createServer(app);
+  initSocket(httpServer);
+  const server: Server = httpServer.listen(port, () => {
     console.log('Sever is running on port ', port);
     seedSuperAdmin();
   });

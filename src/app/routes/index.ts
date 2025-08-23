@@ -1,6 +1,7 @@
 import express, { Router, Request, Response } from 'express';
 import { AuthRoutes } from '../modules/auth/auth.routes';
 import { UserRouters } from '../modules/user/user.routes';
+import { ChatRoutes } from '../modules/chat/chat.routes';
 // need to import below two to upload image -> upload is the middleware
 // uploadImage is the function
 import { uploadFile } from '../utils/uploadFile';
@@ -21,6 +22,10 @@ const moduleRoutes: ModuleRoute[] = [
   {
     path: '/users',
     route: UserRouters,
+  },
+  {
+    path: '/chat',
+    route: ChatRoutes,
   }
 ];
 
