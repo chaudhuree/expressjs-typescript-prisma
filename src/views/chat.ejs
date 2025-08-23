@@ -152,9 +152,12 @@
     if(res.ok) return res.json().then(r => r.data);
     return null;
   }
-  async function fetchUsers(){
-    const res = await fetch('/api/v1/users', { headers });
-    if(res.ok) return res.json().then(r => r.data);
+  async function fetchUsers(search = ''){
+    const url = search ? `/api/v1/users?search=${encodeURIComponent(search)}` : '/api/v1/users';
+    try{
+      const res = await fetch(url, { headers, cache: 'no-store' });
+      if(res.ok) return res.json().then(r => r.data);
+    }catch(_e){ /* ignore and fallback below */ }
     return [];
   }
   async function fetchConversations(){
@@ -192,12 +195,17 @@
     await markSeen(user.id);
   }
 
-  // Search
-  searchInput.addEventListener('input', () => {
-    const q = searchInput.value.toLowerCase();
-    const filtered = users.filter(u => (u.firstName+" "+u.lastName+" "+u.email).toLowerCase().includes(q));
-    renderUsers(filtered);
-  });
+  // Search (server-side with debounce)
+  function debounce(fn, ms){
+    let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+  }
+  const doSearch = debounce(async () => {
+    const q = searchInput.value.trim();
+    const list = await fetchUsers(q);
+    users = list; // keep global in sync
+    renderUsers(users);
+  }, 300);
+  searchInput.addEventListener('input', doSearch);
 
   // Send message form
   messageForm.addEventListener('submit', async (e) => {
@@ -249,15 +257,20 @@
           messagesEl.appendChild(row);
           messagesEl.scrollTop = messagesEl.scrollHeight;
           // mark seen since we are viewing this chat
-          try { await markSeen(selectedUser.id); } catch(e) {}
+          await markSeen(message.senderId);
         } else {
-          // Refresh conversations so recipient sees latest in the inbox
-          try {
-            conversations = await fetchConversations();
-            renderConversations();
-          } catch (e) {}
+          conversations = await fetchConversations();
+          renderConversations();
         }
       });
+
+      // Live users list updates
+      const refreshUsers = async () => {
+        users = await fetchUsers('');
+        renderUsers(users);
+      };
+      socket.on('user:online', refreshUsers);
+      socket.on('user:offline', refreshUsers);
 
       socket.on('message:seen', ({ conversationId, seenBy }) => {
         // Optionally, update UI to show seen receipts

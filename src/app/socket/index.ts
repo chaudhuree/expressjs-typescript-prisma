@@ -55,19 +55,8 @@ export const initSocket = (server: HttpServer) => {
       // Mark online
       await prisma.user.update({ where: { id: user.id }, data: { isOnline: true } });
 
-      // Notify only relevant contacts (participants who share a conversation with this user)
-      const convos = await prisma.conversation.findMany({
-        where: { participants: { has: user.id } },
-        select: { participants: true },
-      });
-      const contacts = Array.from(
-        new Set(
-          convos.flatMap(c => c.participants.filter(pid => pid !== user.id))
-        )
-      );
-      contacts.forEach(uid => {
-        io?.to(uid).emit("user:online", { userId: user.id });
-      });
+      // Broadcast online globally so user lists can refresh
+      io?.emit("user:online", { userId: user.id });
 
       socket.on("disconnect", async () => {
         try {
@@ -85,9 +74,8 @@ export const initSocket = (server: HttpServer) => {
               convos.flatMap(c => c.participants.filter(pid => pid !== user.id))
             )
           );
-          contacts.forEach(uid => {
-            io?.to(uid).emit("user:offline", { userId: user.id });
-          });
+          // Broadcast offline globally so user lists can refresh
+          io?.emit("user:offline", { userId: user.id });
         } catch (e) {
           // ignore
         }
