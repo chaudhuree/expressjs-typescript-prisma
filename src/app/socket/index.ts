@@ -6,6 +6,29 @@ import config from "../../config";
 
 let io: IOServer | null = null;
 
+// Track how many active socket connections each user has
+const userConnections: Map<string, number> = new Map();
+
+// Retry helper for Prisma deadlocks/write conflicts (P2034)
+async function retryPrisma<T>(fn: () => Promise<T>, retries = 5, baseDelayMs = 50): Promise<T> {
+  let lastErr: any;
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      return await fn();
+    } catch (err: any) {
+      // Prisma P2034: Transaction failed due to a write conflict or a deadlock
+      if (err?.code === 'P2034') {
+        lastErr = err;
+        const delay = baseDelayMs * Math.pow(2, attempt) + Math.floor(Math.random() * 20);
+        await new Promise(res => setTimeout(res, delay));
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw lastErr;
+}
+
 export const initSocket = (server: HttpServer) => {
   io = new IOServer(server, {
     cors: {
@@ -13,6 +36,7 @@ export const initSocket = (server: HttpServer) => {
         "http://localhost:3000",
         "http://localhost:3001",
         "http://localhost:5000",
+        "http://localhost:5173",
       ],
       credentials: true,
     },
@@ -52,29 +76,32 @@ export const initSocket = (server: HttpServer) => {
       socket.join(user.id);
       console.log(`[socket] ${user.id} joined personal room`);
 
-      // Mark online
-      await prisma.user.update({ where: { id: user.id }, data: { isOnline: true } });
+      // Increment connection count and mark online on first connection only
+      const prev = userConnections.get(user.id) || 0;
+      const next = prev + 1;
+      userConnections.set(user.id, next);
+      if (next === 1) {
+        await retryPrisma(() => prisma.user.update({ where: { id: user.id }, data: { isOnline: true } }));
+      }
 
       // Broadcast online globally so user lists can refresh
       io?.emit("user:online", { userId: user.id });
 
       socket.on("disconnect", async () => {
         try {
-          await prisma.user.update({
+          // Decrement connection count and mark offline on last disconnect only
+          const prev = userConnections.get(user.id) || 1;
+          const next = prev - 1;
+          if (next > 0) {
+            userConnections.set(user.id, next);
+            return;
+          }
+          userConnections.delete(user.id);
+          await retryPrisma(() => prisma.user.update({
             where: { id: user.id },
             data: { isOnline: false, lastSeen: new Date() },
-          });
-          // Notify relevant contacts only
-          const convos = await prisma.conversation.findMany({
-            where: { participants: { has: user.id } },
-            select: { participants: true },
-          });
-          const contacts = Array.from(
-            new Set(
-              convos.flatMap(c => c.participants.filter(pid => pid !== user.id))
-            )
-          );
-          // Broadcast offline globally so user lists can refresh
+          }));
+          // Optionally notify only relevant contacts; currently broadcasting for simplicity
           io?.emit("user:offline", { userId: user.id });
         } catch (e) {
           // ignore
