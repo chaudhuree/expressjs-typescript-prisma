@@ -101,14 +101,35 @@ export default function Chat(){
     e.preventDefault()
     const content = inputRef.current.value.trim()
     if(!content || !selectedUser) return
+    // Create a temporary optimistic message
+    const tempId = `temp-${Date.now()}`
+    const tempMsg = {
+      id: tempId,
+      senderId: me?.id,
+      receiverId: selectedUser.id,
+      content,
+      createdAt: new Date().toISOString(),
+      _temp: true,
+      _status: 'sending',
+    }
+    inputRef.current.value = ''
+    setMessages(prev => [...prev, tempMsg])
+    scrollToBottom()
+
     try{
       // Persist via REST; socket will also emit to both users
-      const msg = await sendMessageApi(selectedUser.id, content)
-      inputRef.current.value = ''
-      setMessages(prev => dedupeById([...prev, msg]))
+      const real = await sendMessageApi(selectedUser.id, content)
+      setMessages(prev => {
+        // remove temp
+        const withoutTemp = prev.filter(m => m.id !== tempId)
+        // if socket already added the real message, just return without temp
+        if (withoutTemp.some(m => m.id === real.id)) return withoutTemp
+        return dedupeById([...withoutTemp, real])
+      })
       scrollToBottom()
     }catch(err){
-      alert(err.message || 'Failed to send message')
+      // mark temp as failed
+      setMessages(prev => prev.map(m => m.id === tempId ? { ...m, _status: 'failed' } : m))
     }
   }
 
@@ -170,7 +191,11 @@ export default function Chat(){
               <div key={m.id} className={`flex ${m.senderId === me?.id ? 'justify-end' : 'justify-start'}`}>
                 <div className={`${m.senderId === me?.id ? 'bg-blue-600 text-white' : 'bg-white border'} max-w-[70%] rounded px-3 py-2`}>
                   <div className="text-sm">{m.content}</div>
-                  <div className="text-[10px] opacity-70 mt-1">{new Date(m.createdAt).toLocaleTimeString()}</div>
+                  <div className="text-[10px] opacity-70 mt-1 flex items-center gap-2">
+                    <span>{new Date(m.createdAt).toLocaleTimeString()}</span>
+                    {m._status === 'sending' && <span className="italic text-gray-300">Sending…</span>}
+                    {m._status === 'failed' && <span className="text-red-400">Failed</span>}
+                  </div>
                 </div>
               </div>
             ))
