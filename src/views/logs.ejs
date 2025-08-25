@@ -27,6 +27,7 @@
           <th class="px-3 py-2 text-left">Resp (ms)</th>
           <th class="px-3 py-2 text-left">IP</th>
           <th class="px-3 py-2 text-left">Context</th>
+          <th class="px-3 py-2 text-left">Body</th>
         </tr>
       </thead>
       <tbody id="logBody" class="divide-y">
@@ -84,6 +85,7 @@
     for (const it of items) {
       const tr = document.createElement('tr');
       tr.className = 'hover:bg-gray-50';
+      const hasBody = it?.meta && it?.meta.body !== undefined && it?.meta.body !== null;
       const ts = it.timestamp ? new Date(it.timestamp).toLocaleString() : '';
       tr.innerHTML = `
         <td class="px-3 py-2 whitespace-nowrap">${ts}</td>
@@ -95,6 +97,9 @@
         <td class="px-3 py-2">${it.responseTime ?? ''}</td>
         <td class="px-3 py-2">${it.ip || ''}</td>
         <td class="px-3 py-2">${it.context || ''}</td>
+        <td class="px-3 py-2">
+          ${hasBody ? `<button class="view-body px-2 py-1 rounded bg-gray-200 hover:bg-gray-300 text-xs" data-body='${JSON.stringify(it.meta.body).replace(/'/g, "&apos;")}' title="View body">{}</button>` : ''}
+        </td>
       `;
       tbody.appendChild(tr);
     }
@@ -130,6 +135,41 @@
     } catch (e) {
       console.error('[logs] Delete error', e);
       alert('Failed to delete logs');
+    }
+  });
+
+  // Modal to show body
+  const modal = document.createElement('div');
+  modal.id = 'bodyModal';
+  modal.className = 'fixed inset-0 bg-black/50 hidden flex items-center justify-center z-50';
+  modal.innerHTML = `
+    <div class="bg-white rounded shadow-lg w-[90vw] max-w-2xl">
+      <div class="flex items-center justify-between px-4 py-2 border-b">
+        <h3 class="font-semibold">Request Body</h3>
+        <button id="closeBodyModal" class="text-gray-600 hover:text-black">✕</button>
+      </div>
+      <div class="p-4">
+        <pre class="whitespace-pre-wrap text-xs bg-gray-50 border rounded p-3" id="bodyContent"></pre>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  const bodyContent = document.getElementById('bodyContent');
+  const closeBodyModal = document.getElementById('closeBodyModal');
+  closeBodyModal.addEventListener('click', () => modal.classList.add('hidden'));
+  modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.add('hidden'); });
+
+  // Delegate click for body buttons
+  tbody.addEventListener('click', (e) => {
+    const t = e.target;
+    if (t && t.classList && t.classList.contains('view-body')) {
+      const data = t.getAttribute('data-body');
+      try {
+        const obj = JSON.parse(data || 'null');
+        bodyContent.textContent = JSON.stringify(obj, null, 2);
+      } catch {
+        bodyContent.textContent = String(data || '');
+      }
+      modal.classList.remove('hidden');
     }
   });
 

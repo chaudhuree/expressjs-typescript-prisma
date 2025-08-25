@@ -7,7 +7,7 @@ import path from "path";
 import globalErrorHandler from "./app/middlewares/globalErrorHandler";
 import router from "./app/routes";
 import { ViewRoutes } from "./app/routes/view.routes";
-import { requestLogger } from "./app/utils/logger";
+import { requestLogger, logError } from "./app/utils/logger";
 
 const app: Application = express();
 app.use(
@@ -54,7 +54,15 @@ app.use("/api/v1", router);
 app.use(globalErrorHandler);
 
 app.use((req: Request, res: Response, next: NextFunction) => {
-  res.status(httpStatus.NOT_FOUND).json({
+  // Build 404 response
+  res.status(httpStatus.NOT_FOUND);
+
+  // Log as error for API paths (logger will filter non-API)
+  try {
+    logError(new Error('API NOT FOUND'), req, res);
+  } catch {}
+
+  return res.json({
     success: false,
     message: "API NOT FOUND!",
     error: {
