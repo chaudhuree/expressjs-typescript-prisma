@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { fetchUsers, fetchMe } from '../api/users'
 import { listConversations, getMessages, markSeen, sendMessage as sendMessageApi } from '../api/chat'
-import { getSocket, onMessageNew, onUserOnline, onUserOffline } from '../socket'
+import { getSocket, onMessageNew, onUserOnline, onUserOffline, disconnectSocket } from '../socket'
+import { logout as logoutAuth } from '../api/auth'
 
 export default function Chat(){
+  const nav = useNavigate()
   const [me, setMe] = useState(null)
   const [users, setUsers] = useState([])
   const [conversations, setConversations] = useState([])
@@ -107,27 +110,39 @@ export default function Chat(){
   }
 
   return (
-    <div className="min-h-screen grid grid-cols-1 md:grid-cols-[320px,1fr]">
+    <div className="h-[90vh] overflow-hidden grid grid-cols-1 md:grid-cols-[320px,1fr] min-h-0">
       {/* Sidebar */}
-      <aside className="border-r bg-white">
-        <div className="p-3 border-b">
-          <input value={search} onChange={(e)=>setSearch(e.target.value)} placeholder="Search users" className="w-full border rounded px-3 py-2" />
+      <aside className="border-r bg-white flex flex-col">
+        <div className="p-3 border-b flex items-center gap-2">
+          <input value={search} onChange={(e)=>setSearch(e.target.value)} placeholder="Search users" className="flex-1 border rounded px-3 py-2" />
+          <button
+            onClick={() => { logoutAuth(); disconnectSocket(); nav('/login', { replace: true }) }}
+            className="px-3 py-2 text-sm border rounded hover:bg-gray-50"
+            title="Logout"
+          >Logout</button>
         </div>
-        <div className="divide-y max-h-[calc(100vh-60px)] overflow-y-auto">
-          {filteredUsers.map(u => (
-            <button key={u.id} onClick={()=>openChat(u)} className="w-full p-3 text-left hover:bg-gray-50 flex items-center justify-between">
+        <div className="divide-y flex-1 overflow-y-auto">
+          {filteredUsers.map(u => {
+            const active = selectedUser?.id === u.id
+            return (
+            <button
+              key={u.id}
+              onClick={()=>openChat(u)}
+              className={`w-full p-3 text-left flex items-center justify-between transition-colors ${active ? 'bg-blue-100 border-l-4 border-blue-500' : 'hover:bg-blue-50'} `}
+            >
               <div>
                 <div className="font-medium">{[u.firstName,u.lastName].filter(Boolean).join(' ') || u.email}</div>
                 <div className="text-xs text-gray-500">{u.email}</div>
               </div>
               <span className={`text-xs ${u.isOnline ? 'text-green-600' : 'text-gray-400'}`}>{u.isOnline ? 'Online' : 'Offline'}</span>
             </button>
-          ))}
+            )
+          })}
         </div>
       </aside>
 
       {/* Chat area */}
-      <main className="flex flex-col">
+      <main className="grid grid-rows-[auto,1fr,auto] h-full min-h-0 overflow-hidden">
         <header className="p-3 border-b bg-white flex items-center justify-between">
           <div>
             <div className="font-semibold">{selectedUser ? ([selectedUser.firstName, selectedUser.lastName].filter(Boolean).join(' ') || selectedUser.email) : 'Select a user'}</div>
@@ -137,7 +152,7 @@ export default function Chat(){
           </div>
         </header>
 
-        <div ref={messagesRef} className="flex-1 overflow-y-auto p-4 space-y-2 bg-gray-50">
+        <div ref={messagesRef} className="min-h-0 overflow-y-auto p-4 pb-24 space-y-2 bg-gray-50">
           {selectedUser ? (
             messages.map((m) => (
               <div key={m.id} className={`flex ${m.senderId === me?.id ? 'justify-end' : 'justify-start'}`}>
@@ -152,7 +167,7 @@ export default function Chat(){
           )}
         </div>
 
-        <form onSubmit={onSubmit} className="border-t p-3 flex gap-2 bg-white">
+        <form onSubmit={onSubmit} className="border-t p-3 flex gap-2 bg-white shrink-0 sticky bottom-0 z-10">
           <input ref={inputRef} placeholder="Type a message" className="flex-1 border rounded px-3 py-2" />
           <button className="bg-blue-600 text-white px-4 py-2 rounded">Send</button>
         </form>
