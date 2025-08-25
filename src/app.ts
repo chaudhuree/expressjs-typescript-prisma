@@ -4,6 +4,7 @@ import express, { Application, NextFunction, Request, Response } from "express";
 import expressLayouts from "express-ejs-layouts";
 import httpStatus from "http-status";
 import path from "path";
+import fs from "fs";
 import globalErrorHandler from "./app/middlewares/globalErrorHandler";
 import router from "./app/routes";
 import { ViewRoutes } from "./app/routes/view.routes";
@@ -26,17 +27,27 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
-// Request/response logging (non-blocking)
-app.use(requestLogger);
+// Request/response logging (non-blocking) - disabled in production
+if (process.env.NODE_ENV !== 'production') {
+  app.use(requestLogger);
+}
 
-// Set up EJS as view engine
+// Set up EJS as view engine with runtime-resolved paths
 app.set('view engine', 'ejs');
-app.set('views', path.join(__dirname, 'views'));
+const distViews = path.join(__dirname, 'views');
+const srcViews = path.join(process.cwd(), 'src', 'views');
+const viewsDir = fs.existsSync(distViews) ? distViews : srcViews;
+app.set('views', viewsDir);
 app.use(expressLayouts);
 app.set('layout', 'layouts/main');
 
-// Serve static files
-app.use(express.static(path.join(__dirname, 'public')));
+// Serve static files (resolve dist/public then fallback to src/public)
+const distPublic = path.join(__dirname, 'public');
+const srcPublic = path.join(process.cwd(), 'src', 'public');
+const publicDir = fs.existsSync(distPublic) ? distPublic : (fs.existsSync(srcPublic) ? srcPublic : undefined);
+if (publicDir) {
+  app.use(express.static(publicDir));
+}
 
 // API health check route
 app.get("/api/health", (req: Request, res: Response) => {
@@ -58,9 +69,11 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   res.status(httpStatus.NOT_FOUND);
 
   // Log as error for API paths (logger will filter non-API)
-  try {
-    logError(new Error('API NOT FOUND'), req, res);
-  } catch {}
+  if (process.env.NODE_ENV !== 'production') {
+    try {
+      logError(new Error('API NOT FOUND'), req, res);
+    } catch {}
+  }
 
   return res.json({
     success: false,
