@@ -112,7 +112,7 @@ export default function Chat(){
   return (
     <div className="h-[90vh] overflow-hidden grid grid-cols-1 md:grid-cols-[320px,1fr] min-h-0">
       {/* Sidebar */}
-      <aside className="border-r bg-white flex flex-col">
+      <aside className="border-r bg-white flex flex-col px-2">
         <div className="p-3 border-b flex items-center gap-2">
           <input value={search} onChange={(e)=>setSearch(e.target.value)} placeholder="Search users" className="flex-1 border rounded px-3 py-2" />
           <button
@@ -128,7 +128,7 @@ export default function Chat(){
             <button
               key={u.id}
               onClick={()=>openChat(u)}
-              className={`w-full p-3 text-left flex items-center justify-between transition-colors ${active ? 'bg-blue-100 border-l-4 border-blue-500' : 'hover:bg-blue-50'} `}
+              className={`w-full p-3 text-left flex items-center justify-between transition-colors mb-4 border-none ${active ? 'bg-blue-100 border-l-4 border-blue-500' : 'hover:bg-blue-50 '} `}
             >
               <div>
                 <div className="font-medium">{[u.firstName,u.lastName].filter(Boolean).join(' ') || u.email}</div>
