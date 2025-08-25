@@ -14,10 +14,23 @@ export default function Chat(){
   const [messages, setMessages] = useState([])
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
+  const [unreadCounts, setUnreadCounts] = useState({}) // { [userId]: number }
+
+function getMessageKey(m){
+  if(!m) return 'nil'
+  if(m.id) return `id:${m.id}`
+  // fallback composite (handles transports that might omit id)
+  const s = m.senderId || 's'
+  const r = m.receiverId || 'r'
+  const t = m.createdAt || 't'
+  const c = (m.content || '').slice(0, 50)
+  return `k:${s}:${r}:${t}:${c}`
+}
   const inputRef = useRef(null)
   const messagesRef = useRef(null)
   const selectedUserRef = useRef(null)
   const meRef = useRef(null)
+  const processedIdsRef = useRef(new Set())
 
   const isSearching = useMemo(() => Boolean(search && search.trim().length), [search])
   const sidebarUsers = useMemo(() => {
@@ -45,15 +58,27 @@ export default function Chat(){
       const s = getSocket()
       // Register listeners once; use refs to avoid stale closures
       unsub.push(onMessageNew(async ({ message }) => {
+        // Prevent double handling of the same event (e.g., duplicate socket emits)
+        const key = getMessageKey(message)
+        if(processedIdsRef.current.has(key)) return
+        if(processedIdsRef.current.size > 2000){ processedIdsRef.current = new Set() }
+        processedIdsRef.current.add(key)
         const currentSelected = selectedUserRef.current
         const currentMe = meRef.current
         if(currentSelected && (message.senderId === currentSelected.id || message.receiverId === currentSelected.id)){
           setMessages(prev => dedupeById([...prev, message]))
           await markSeen(currentSelected.id)
+          // keep unread badge at zero for active thread
+          setUnreadCounts(prev => ({ ...prev, [currentSelected.id]: 0 }))
           scrollToBottom()
         } else {
           const convos = await listConversations();
           setConversations(convos || [])
+          // If the new message is to me and the thread isn't open, bump unread count
+          if (currentMe && message.receiverId === currentMe.id) {
+            const fromId = message.senderId
+            setUnreadCounts(prev => ({ ...prev, [fromId]: (prev[fromId] || 0) + 1 }))
+          }
         }
       }))
       unsub.push(onUserOnline(async () => {
@@ -94,6 +119,8 @@ export default function Chat(){
     // Backend returns messages in DESC order; show ASC in UI
     setMessages([...list].reverse())
     await markSeen(u.id)
+    // reset unread count for this user
+    setUnreadCounts(prev => ({ ...prev, [u.id]: 0 }))
     setTimeout(scrollToBottom, 0)
   }
 
@@ -167,7 +194,14 @@ export default function Chat(){
                 <div className="font-medium">{[u.firstName,u.lastName].filter(Boolean).join(' ') || u.email}</div>
                 <div className="text-xs text-gray-500">{u.email}</div>
               </div>
-              <span className={`text-xs ${u.isOnline ? 'text-green-600' : 'text-gray-400'}`}>{u.isOnline ? 'Online' : 'Offline'}</span>
+              <div className="flex items-center gap-2">
+                {unreadCounts[u.id] > 0 && !active && (
+                  <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1 rounded-full text-[10px] bg-red-500 text-white">
+                    {unreadCounts[u.id]}
+                  </span>
+                )}
+                <span className={`text-xs ${u.isOnline ? 'text-green-600' : 'text-gray-400'}`}>{u.isOnline ? 'Online' : 'Offline'}</span>
+              </div>
             </button>
             )
           })}
