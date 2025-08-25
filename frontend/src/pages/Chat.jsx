@@ -214,6 +214,12 @@ function getMessageKey(m){
             )
           })}
         </div>
+        {me && (
+          <div className="mt-auto border-t p-3 text-xs text-gray-600 bg-white">
+            <div className="font-medium text-gray-800">{[me.firstName, me.lastName].filter(Boolean).join(' ') || me.email}</div>
+            <div className="text-gray-500">{me.email}</div>
+          </div>
+        )}
       </aside>
 
       {/* Chat area */}
@@ -246,10 +252,12 @@ function getMessageKey(m){
           )}
         </div>
 
-        <form onSubmit={onSubmit} className="border-t p-3 flex gap-2 bg-white shrink-0 sticky bottom-0 z-10">
-          <input ref={inputRef} placeholder="Type a message" className="flex-1 border rounded px-3 py-2" />
-          <button className="bg-blue-600 text-white px-4 py-2 rounded">Send</button>
-        </form>
+        {selectedUser ? (
+          <form onSubmit={onSubmit} className="border-t p-3 flex gap-2 bg-white shrink-0 sticky bottom-0 z-10">
+            <input ref={inputRef} placeholder="Type a message" className="flex-1 border rounded px-3 py-2" />
+            <button className="bg-blue-600 text-white px-4 py-2 rounded">Send</button>
+          </form>
+        ) : null}
       </main>
     </div>
   )
