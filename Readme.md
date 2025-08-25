@@ -72,3 +72,9 @@
     npx prisma generate
     npm run generate-module [model-name]
 ```
+
+## to stop logger
+
+```markdown
+    NODE_ENV=development
+```
