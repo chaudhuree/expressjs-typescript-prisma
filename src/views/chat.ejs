@@ -20,6 +20,8 @@
         <!-- Filled by JS -->
       </div>
     </div>
+    <!-- Current user footer -->
+    <div id="meInfo" class="mt-3 border-t pt-3 text-xs text-gray-600"></div>
   </div>
 
   <!-- Right panel: messages -->
@@ -35,7 +37,7 @@
       <!-- Messages here -->
     </div>
 
-    <form id="messageForm" class="border-t p-3 flex gap-2">
+    <form id="messageForm" class="border-t p-3 flex gap-2 hidden">
       <input id="messageInput" type="text" placeholder="Type a message" class="flex-1 border rounded px-3 py-2 focus:outline-none focus:ring" />
       <button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700" type="submit">Send</button>
     </form>
@@ -46,6 +48,27 @@
 <script>
   if (typeof io === 'undefined') {
     console.error('Socket.IO client failed to load. Check network/SRI.');
+  }
+
+  // Fallback: compute unseen counts client-side if missing from API
+  async function fillMissingUnseenCounts() {
+    if (!currentUser || !Array.isArray(conversations) || !conversations.length) return;
+    const tasks = conversations.map(async (item) => {
+      // If API already provided a positive unseenCount, skip
+      if (typeof item.unseenCount === 'number' && item.unseenCount > 0) return;
+      const other = item.otherUser;
+      if (!other || !other.id) return;
+      try {
+        const data = await fetchMessages(other.id);
+        const msgs = Array.isArray(data?.messages) ? data.messages : [];
+        const count = msgs.filter(m => m.receiverId === currentUser.id && !m.seen).length;
+        if (count > 0) {
+          item.unseenCount = count;
+        }
+      } catch(_e) { /* ignore */ }
+    });
+    await Promise.allSettled(tasks);
+    renderConversations();
   }
   // Helpers
   function getCookie(name){
@@ -71,6 +94,7 @@
   const messageInput = document.getElementById('messageInput');
   const chatUserName = document.getElementById('chatUserName');
   const chatUserPresence = document.getElementById('chatUserPresence');
+  const meInfo = document.getElementById('meInfo');
 
   // Renderers
   function renderConversations(){
@@ -84,12 +108,14 @@
       const el = document.createElement('button');
       el.className = 'w-full text-left p-3 border-b hover:bg-gray-50 flex items-center justify-between';
       const name = (other.firstName||'') + ' ' + (other.lastName||'');
+      const showBadge = Number(item.unseenCount || 0) > 0 && (!selectedUser || selectedUser.id !== other.id);
       el.innerHTML = `
         <div>
           <div class="font-medium">${name || other.email || 'Unknown'}</div>
           <div class="text-xs text-gray-500">${item.lastMessage?.content ? item.lastMessage.content.slice(0,40) : ''}</div>
         </div>
-        <div>
+        <div class="flex items-center gap-2">
+          ${showBadge ? `<span class="inline-flex items-center justify-center min-w-[20px] h-5 px-1 rounded-full text-[10px] bg-red-500 text-white">${item.unseenCount}</span>` : ''}
           <span class="text-xs ${other.isOnline ? 'text-green-600' : 'text-gray-400'}">${other.isOnline ? 'Online' : 'Offline'}</span>
         </div>`;
       el.onclick = () => openChat(other);
@@ -139,12 +165,16 @@
     if(!u){
       chatUserName.textContent = 'Select a chat';
       chatUserPresence.textContent = '';
+      // hide input when no chat is selected
+      messageForm.classList.add('hidden');
       return;
     }
     const name = (u.firstName||'') + ' ' + (u.lastName||'');
     chatUserName.textContent = name || u.email;
     chatUserPresence.textContent = u.isOnline ? 'Online' : 'Offline';
     chatUserPresence.className = 'text-xs px-2 py-0.5 rounded ' + (u.isOnline ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600');
+    // show input when chat is selected
+    messageForm.classList.remove('hidden');
   }
 
   // API
@@ -194,6 +224,11 @@
     const data = await fetchMessages(user.id);
     renderMessages(data.messages || []);
     await markSeen(user.id);
+    // refresh conversations so unread badge resets to 0
+    conversations = await fetchConversations();
+    renderConversations();
+    // Ensure fallback counts are consistent
+    await fillMissingUnseenCounts();
   }
 
   // Search (server-side with debounce)
@@ -244,12 +279,21 @@
   (async function init(){
     // current user
     currentUser = await fetchMe();
+    if (currentUser) {
+      const displayName = ((currentUser.firstName||'') + ' ' + (currentUser.lastName||'')).trim() || currentUser.email || '';
+      meInfo.innerHTML = `
+        <div class="font-medium text-gray-800">${displayName}</div>
+        <div class="text-gray-500">${currentUser.email||''}</div>
+      `;
+    }
     // users list
     users = await fetchUsers();
     renderUsers(users);
     // conversations
     conversations = await fetchConversations();
     renderConversations();
+    // Fill in missing unseen counts for legacy data
+    await fillMissingUnseenCounts();
 
     // connect socket
     {
@@ -271,9 +315,13 @@
           messagesEl.scrollTop = messagesEl.scrollHeight;
           // mark seen since we are viewing this chat
           await markSeen(message.senderId);
+          // keep unread badge at zero for active thread
+          conversations = await fetchConversations();
+          renderConversations();
         } else {
           conversations = await fetchConversations();
           renderConversations();
+          await fillMissingUnseenCounts();
         }
       });
 
