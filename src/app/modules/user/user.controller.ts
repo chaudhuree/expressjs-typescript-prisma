@@ -14,10 +14,11 @@ const registerUser = catchAsync(async (req, res) => {
 });
 
 const getAllUsers = catchAsync(async (req, res) => {
-  const result = await UserServices.getAllUsersFromDB();
+  const search = (req.query.search as string | undefined) || undefined;
+  const result = await UserServices.getAllUsersFromDB(search);
 
   sendResponse(res, {
-    statusCode: httpStatus.CREATED,
+    statusCode: httpStatus.OK,
     message: 'Users Retrieve successfully',
     data: result,
   });

@@ -8,8 +8,8 @@ import { logout as logoutAuth } from '../api/auth'
 export default function Chat(){
   const nav = useNavigate()
   const [me, setMe] = useState(null)
-  const [users, setUsers] = useState([])
-  const [conversations, setConversations] = useState([])
+  const [users, setUsers] = useState([]) // search results only
+  const [conversations, setConversations] = useState([]) // past chats
   const [selectedUser, setSelectedUser] = useState(null)
   const [messages, setMessages] = useState([])
   const [search, setSearch] = useState('')
@@ -19,18 +19,26 @@ export default function Chat(){
   const selectedUserRef = useRef(null)
   const meRef = useRef(null)
 
-  const filteredUsers = useMemo(() => users.filter(u => u.id !== me?.id), [users, me])
+  const isSearching = useMemo(() => Boolean(search && search.trim().length), [search])
+  const sidebarUsers = useMemo(() => {
+    if(isSearching){
+      return users.filter(u => u.id !== me?.id)
+    }
+    // default: show only users from conversations
+    return (conversations || [])
+      .map(c => c.otherUser)
+      .filter(u => u && u.id !== me?.id)
+  }, [isSearching, users, conversations, me])
 
   useEffect(() => {
     let unsub = []
     ;(async () => {
       try{
         setLoading(true)
-        const [meData, usersData, convos] = await Promise.all([
-          fetchMe(), fetchUsers(), listConversations()
+        const [meData, convos] = await Promise.all([
+          fetchMe(), listConversations()
         ])
         setMe(meData)
-        setUsers(usersData)
         setConversations(convos || [])
       } finally { setLoading(false) }
 
@@ -49,12 +57,12 @@ export default function Chat(){
         }
       }))
       unsub.push(onUserOnline(async () => {
-        const list = await fetchUsers({})
-        setUsers(list)
+        const convos = await listConversations();
+        setConversations(convos || [])
       }))
       unsub.push(onUserOffline(async () => {
-        const list = await fetchUsers({})
-        setUsers(list)
+        const convos = await listConversations();
+        setConversations(convos || [])
       }))
     })()
 
@@ -66,11 +74,15 @@ export default function Chat(){
   useEffect(() => { selectedUserRef.current = selectedUser }, [selectedUser])
   useEffect(() => { meRef.current = me }, [me])
 
-  // Server-side search with debounce
+  // Server-side search with debounce (only when search has value)
   useEffect(() => {
     const t = setTimeout(async () => {
-      const list = await fetchUsers(search ? { search } : {})
-      setUsers(list)
+      if(search && search.trim().length){
+        const list = await fetchUsers({ search })
+        setUsers(list || [])
+      } else {
+        setUsers([])
+      }
     }, 300)
     return () => clearTimeout(t)
   }, [search])
@@ -121,8 +133,8 @@ export default function Chat(){
             title="Logout"
           >Logout</button>
         </div>
-        <div className="divide-y flex-1 overflow-y-auto">
-          {filteredUsers.map(u => {
+        <div className="divide-y flex-1 overflow-y-auto mt-4">
+          {sidebarUsers.map(u => {
             const active = selectedUser?.id === u.id
             return (
             <button

@@ -1,4 +1,4 @@
-import { User } from '@prisma/client';
+import { User, Prisma } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import prisma from '../../utils/prisma';
 import AppError from '../../errors/AppError';
@@ -56,8 +56,19 @@ const registerUserIntoDB = async (payload: any) => {
   return user;
 };
 
-const getAllUsersFromDB = async () => {
+const getAllUsersFromDB = async (search?: string) => {
+  const where: Prisma.UserWhereInput = search && search.trim().length
+    ? {
+        OR: [
+          { firstName: { contains: search, mode: Prisma.QueryMode.insensitive } },
+          { lastName: { contains: search, mode: Prisma.QueryMode.insensitive } },
+          { email: { contains: search, mode: Prisma.QueryMode.insensitive } },
+        ],
+      }
+    : {};
+
   const result = await prisma.user.findMany({
+    where,
     select: {
       id: true,
       firstName: true,
@@ -70,6 +81,8 @@ const getAllUsersFromDB = async () => {
       createdAt: true,
       updatedAt: true,
     },
+    orderBy: { createdAt: 'desc' },
+    take: 50,
   });
 
   return result;
