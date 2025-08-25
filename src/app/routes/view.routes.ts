@@ -44,6 +44,23 @@ router.get('/chat', (req: Request, res: Response) => {
   });
 });
 
+// Logs page
+router.get('/log', (req: Request, res: Response) => {
+  const token = req.cookies?.accessToken;
+  let user = null;
+  if (token) {
+    try {
+      user = verifyToken(token);
+    } catch (e) {
+      // ignore
+    }
+  }
+  res.render('logs', {
+    title: 'Application Logs',
+    user,
+  });
+});
+
 // Login page
 router.get('/auth/login', (req: Request, res: Response) => {
   res.render('login', { 

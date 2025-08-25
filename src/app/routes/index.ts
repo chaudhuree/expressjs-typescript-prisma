@@ -2,6 +2,8 @@ import express, { Router, Request, Response } from 'express';
 import { AuthRoutes } from '../modules/auth/auth.routes';
 import { UserRouters } from '../modules/user/user.routes';
 import { ChatRoutes } from '../modules/chat/chat.routes';
+import { LogRoutes } from '../modules/log/log.routes';
+import { clearLogs } from '../modules/log/log.service';
 // need to import below two to upload image -> upload is the middleware
 // uploadImage is the function
 import { uploadFile } from '../utils/uploadFile';
@@ -26,6 +28,11 @@ const moduleRoutes: ModuleRoute[] = [
   {
     path: '/chat',
     route: ChatRoutes,
+  }
+  ,
+  {
+    path: '/logs',
+    route: LogRoutes,
   }
 ];
 
@@ -52,5 +59,7 @@ router.post("/upload", upload.single("image"), (req: Request, res: Response) => 
     return res.status(400).json({ success: false, error: "No file provided" });
   }
 });
+
+
 
 export default router;

@@ -7,6 +7,7 @@ import path from "path";
 import globalErrorHandler from "./app/middlewares/globalErrorHandler";
 import router from "./app/routes";
 import { ViewRoutes } from "./app/routes/view.routes";
+import { requestLogger } from "./app/utils/logger";
 
 const app: Application = express();
 app.use(
@@ -24,6 +25,9 @@ app.use(
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
+
+// Request/response logging (non-blocking)
+app.use(requestLogger);
 
 // Set up EJS as view engine
 app.set('view engine', 'ejs');

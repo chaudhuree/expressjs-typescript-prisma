@@ -7,6 +7,7 @@ import { NextFunction, Request, Response } from 'express';
 import { ZodError } from 'zod';
 import AppError from '../errors/AppError';
 import handleZodError from '../errors/handleZodError';
+import { logError } from '../utils/logger';
 
 const globalErrorHandler = (
   err: any,
@@ -80,6 +81,13 @@ const globalErrorHandler = (
     message,
     errorDetails,
   });
+
+  // enqueue error log (non-blocking)
+  try {
+    logError(err, req, res);
+  } catch (_) {
+    // do nothing
+  }
 };
 
 export default globalErrorHandler;

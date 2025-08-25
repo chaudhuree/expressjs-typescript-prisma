@@ -1,0 +1,138 @@
+<div class="bg-white rounded-lg shadow p-4">
+  <div class="flex items-center justify-between mb-4">
+    <h1 class="text-xl font-semibold">Application Logs</h1>
+    <div class="flex items-center gap-2">
+      <label class="text-sm text-gray-600">Level</label>
+      <select id="levelFilter" class="border rounded px-2 py-1 text-sm">
+        <option>ALL</option>
+        <option>ERROR</option>
+        <option>WARN</option>
+        <option>INFO</option>
+        <option>DEBUG</option>
+      </select>
+      <button id="deleteAllBtn" type="button" class="ml-3 px-3 py-1.5 rounded text-sm bg-red-600 text-white hover:bg-red-700">Delete All</button>
+    </div>
+  </div>
+
+  <div class="overflow-auto">
+    <table class="min-w-full text-sm">
+      <thead class="bg-gray-50 text-gray-600">
+        <tr>
+          <th class="px-3 py-2 text-left">Timestamp</th>
+          <th class="px-3 py-2 text-left">Level</th>
+          <th class="px-3 py-2 text-left">Message</th>
+          <th class="px-3 py-2 text-left">URL</th>
+          <th class="px-3 py-2 text-left">Method</th>
+          <th class="px-3 py-2 text-left">Status</th>
+          <th class="px-3 py-2 text-left">Resp (ms)</th>
+          <th class="px-3 py-2 text-left">IP</th>
+          <th class="px-3 py-2 text-left">Context</th>
+        </tr>
+      </thead>
+      <tbody id="logBody" class="divide-y">
+      </tbody>
+    </table>
+  </div>
+
+  <div class="flex items-center justify-between mt-4">
+    <div class="text-sm text-gray-600" id="pageInfo"></div>
+    <div class="flex items-center gap-2">
+      <button id="prevBtn" class="px-3 py-1 border rounded disabled:opacity-40">Prev</button>
+      <button id="nextBtn" class="px-3 py-1 border rounded disabled:opacity-40">Next</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const tbody = document.getElementById('logBody');
+  const pageInfo = document.getElementById('pageInfo');
+  const prevBtn = document.getElementById('prevBtn');
+  const nextBtn = document.getElementById('nextBtn');
+  const levelFilter = document.getElementById('levelFilter');
+  const deleteAllBtn = document.getElementById('deleteAllBtn');
+
+  let page = 1;
+  let totalPages = 1;
+  let level = 'ALL';
+  const limit = 20;
+
+  function badge(level) {
+    const base = 'px-2 py-0.5 rounded text-xs font-medium';
+    switch(level) {
+      case 'ERROR': return `${base} bg-red-100 text-red-700`;
+      case 'WARN': return `${base} bg-amber-100 text-amber-700`;
+      case 'INFO': return `${base} bg-blue-100 text-blue-700`;
+      case 'DEBUG': return `${base} bg-gray-200 text-gray-700`;
+      default: return `${base} bg-gray-100 text-gray-700`;
+    }
+  }
+
+  async function fetchLogs() {
+    const res = await fetch(`/api/v1/logs?level=${encodeURIComponent(level)}&page=${page}&limit=${limit}`);
+    const json = await res.json();
+    if (!json.success) return;
+    const data = json.data;
+    totalPages = data.totalPages || 1;
+    renderRows(data.items || []);
+    pageInfo.textContent = `Page ${data.page} of ${totalPages} · ${data.total} logs`;
+    prevBtn.disabled = page <= 1;
+    nextBtn.disabled = page >= totalPages;
+  }
+
+  function renderRows(items) {
+    tbody.innerHTML = '';
+    for (const it of items) {
+      const tr = document.createElement('tr');
+      tr.className = 'hover:bg-gray-50';
+      const ts = it.timestamp ? new Date(it.timestamp).toLocaleString() : '';
+      tr.innerHTML = `
+        <td class="px-3 py-2 whitespace-nowrap">${ts}</td>
+        <td class="px-3 py-2"><span class="${badge(it.level)}">${it.level}</span></td>
+        <td class="px-3 py-2 max-w-[380px] truncate" title="${it.message || ''}">${it.message || ''}</td>
+        <td class="px-3 py-2 max-w-[260px] truncate" title="${it.requestUrl || ''}">${it.requestUrl || ''}</td>
+        <td class="px-3 py-2">${it.method || ''}</td>
+        <td class="px-3 py-2">${it.statusCode ?? ''}</td>
+        <td class="px-3 py-2">${it.responseTime ?? ''}</td>
+        <td class="px-3 py-2">${it.ip || ''}</td>
+        <td class="px-3 py-2">${it.context || ''}</td>
+      `;
+      tbody.appendChild(tr);
+    }
+  }
+
+  prevBtn.addEventListener('click', () => { if (page > 1) { page--; fetchLogs(); } });
+  nextBtn.addEventListener('click', () => { if (page < totalPages) { page++; fetchLogs(); } });
+  levelFilter.addEventListener('change', () => { level = levelFilter.value; page = 1; fetchLogs(); });
+  deleteAllBtn.addEventListener('click', async () => {
+    if (!confirm('Delete ALL logs? This action cannot be undone.')) return;
+    try {
+      console.log('[logs] Sending DELETE /api/v1/logs');
+      let res = await fetch('/api/v1/logs', { method: 'DELETE' });
+      if (!res.ok) {
+        // Fallback for environments blocking DELETE
+        console.log('[logs] Fallback POST /api/v1/logs/clear');
+        res = await fetch('/api/v1/logs/clear', { method: 'POST' });
+      }
+      if (!res.ok) {
+        // Final fallback to top-level route
+        console.log('[logs] Final fallback POST /api/v1/logs-clear');
+        res = await fetch('/api/v1/logs-clear', { method: 'POST' });
+      }
+      const json = await res.json().catch(() => ({}));
+      if (res.ok && json?.success) {
+        page = 1;
+        await fetchLogs();
+        alert(`Deleted ${json.deleted || 0} logs`);
+      } else {
+        console.error('[logs] Delete failed', json);
+        alert('Failed to delete logs');
+      }
+    } catch (e) {
+      console.error('[logs] Delete error', e);
+      alert('Failed to delete logs');
+    }
+  });
+
+  // init
+  fetchLogs();
+</script>

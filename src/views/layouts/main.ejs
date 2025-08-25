@@ -12,7 +12,7 @@
         }
     </script>
 </head>
-<body class="bg-gray-100 min-h-[90vh] overflow-hidden">
+<body class="bg-gray-100 min-h-[90vh] ">
     <div class="container mx-auto px-4 py-8">
         <header class="mb-8">
             <nav class="flex justify-between items-center py-4">
@@ -20,6 +20,7 @@
                 <div class="space-x-4 flex items-center">
                     <% if (typeof user !== 'undefined' && user) { %>
                         <a href="/chat" class="text-gray-600 hover:text-blue-600">Chat</a>
+                        <a href="/log" class="text-gray-600 hover:text-blue-600">Logs</a>
                         <span class="text-sm text-gray-500 mr-2">Hi, <%= user.firstName || user.email %></span>
                         <a href="/auth/logout" class="text-gray-600 hover:text-blue-600">Logout</a>
                     <% } else { %>

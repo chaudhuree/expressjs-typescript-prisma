@@ -76,6 +76,25 @@ model UnseenCounter {
   @@unique([conversationId, userId])
 }
 
+/// Application logs for requests, responses, and errors
+model Log {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  timestamp    DateTime @default(now())
+  level        LogLevel
+  message      String
+  context      String?
+  requestUrl   String?
+  method       String?
+  statusCode   Int?
+  responseTime Int? // in ms
+  ip           String?
+  userAgent    String?
+  meta         Json?
+
+  @@index([timestamp])
+  @@index([level])
+}
+
 enum UserRoleEnum {
   USER
   ADMIN
@@ -92,4 +111,11 @@ enum PositionEnum {
   SUBSONTRUCTOR
   EMPLOYEE
   MANAGER
+}
+
+enum LogLevel {
+  DEBUG
+  INFO
+  WARN
+  ERROR
 }
