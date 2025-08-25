@@ -255,23 +255,59 @@
   }, 300);
   searchInput.addEventListener('input', doSearch);
 
-  // Send message form
+  // Send message form (optimistic UI with Sending… status)
   messageForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const content = messageInput.value.trim();
     if(!content || !selectedUser) return;
+
+    // create a temporary optimistic message row
+    const tempId = `temp-${Date.now()}`;
+    const nowStr = new Date().toLocaleTimeString();
+    const tempRow = document.createElement('div');
+    tempRow.dataset.tempId = tempId;
+    tempRow.className = 'flex justify-end';
+    tempRow.innerHTML = `
+      <div class=\"max-w-[70%] rounded px-3 py-2 bg-blue-600 text-white\">
+        <div class=\"text-sm\">${content}</div>
+        <div class=\"text-[10px] opacity-70 mt-1 flex items-center gap-2\">
+          <span>${nowStr}</span>
+          <span class=\"italic text-gray-200\">Sending…</span>
+        </div>
+      </div>`;
+    messagesEl.appendChild(tempRow);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+
+    // clear input immediately
+    messageInput.value = '';
+
     try{
       const msg = await sendMessage(selectedUser.id, content);
-      // clear input
-      messageInput.value = '';
-      // append to UI immediately
-      const row = document.createElement('div');
-      row.className = 'flex justify-end';
-      row.innerHTML = `<div class=\"max-w-[70%] rounded px-3 py-2 bg-blue-600 text-white\"><div class=\"text-sm\">${msg.content}</div><div class=\"text-[10px] opacity-70 mt-1\">${new Date(msg.createdAt).toLocaleTimeString()}</div></div>`;
-      messagesEl.appendChild(row);
+      // replace temp row content with the confirmed message (remove Sending…)
+      if (tempRow && tempRow.parentNode) {
+        tempRow.innerHTML = `
+          <div class=\"max-w-[70%] rounded px-3 py-2 bg-blue-600 text-white\">
+            <div class=\"text-sm\">${msg.content}</div>
+            <div class=\"text-[10px] opacity-70 mt-1\">${new Date(msg.createdAt).toLocaleTimeString()}</div>
+          </div>`;
+      }
       messagesEl.scrollTop = messagesEl.scrollHeight;
     } catch(err){
-      alert('Failed to send message');
+      // mark the temp row as failed
+      if (tempRow && tempRow.parentNode) {
+        const status = tempRow.querySelector('span.italic');
+        if (status) {
+          status.classList.remove('italic', 'text-gray-200');
+          status.classList.add('text-red-300');
+          status.textContent = 'Failed';
+        } else {
+          // fallback: append failed note
+          const failed = document.createElement('div');
+          failed.className = 'text-[10px] text-red-300 mt-1 text-right';
+          failed.textContent = 'Failed';
+          tempRow.appendChild(failed);
+        }
+      }
     }
   });
 
