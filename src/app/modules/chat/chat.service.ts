@@ -10,6 +10,20 @@ export const ChatService = {
     });
 
     // For each conversation, fetch the other participant and last message
+    // Preload unseen counters for this user across these conversations to avoid N+1
+    const convoIds = conversations.map((c) => c.id)
+    let unseenMap = new Map<string, number>()
+    const pAny = prisma as any
+    if (pAny?.unseenCounter?.findMany) {
+      const unseenCounters = await pAny.unseenCounter.findMany({
+        where: { userId, conversationId: { in: convoIds } },
+        select: { conversationId: true, count: true },
+      })
+      unseenMap = new Map<string, number>(
+        (unseenCounters as Array<{ conversationId: string; count: number }>).map((u) => [u.conversationId, u.count])
+      )
+    }
+
     const enrichedRaw = await Promise.all(
       conversations.map(async (c) => {
         // Determine the other participant (skip malformed conversations)
@@ -35,7 +49,8 @@ export const ChatService = {
           }),
         ]);
         if (!otherUser) return null;
-        return { conversation: c, otherUser, lastMessage };
+        const unseenCount = unseenMap.get(c.id) || 0;
+        return { conversation: c, otherUser, lastMessage, unseenCount };
       })
     );
 
@@ -86,6 +101,16 @@ export const ChatService = {
       data: { lastMessageAt: msg.createdAt },
     });
 
+    // Increment unseen counter for the receiver (if model exists)
+    const pAny = prisma as any
+    if (pAny?.unseenCounter?.upsert) {
+      await pAny.unseenCounter.upsert({
+        where: { conversationId_userId: { conversationId: convo.id, userId: otherUserId } },
+        update: { count: { increment: 1 } },
+        create: { conversationId: convo.id, userId: otherUserId, count: 1 },
+      })
+    }
+
     // Emit to both participants' rooms so inboxes update in realtime
     const io = getIO();
     io?.to(otherUserId).emit("message:new", { message: msg });
@@ -104,6 +129,16 @@ export const ChatService = {
       },
       data: { seen: true, seenAt: new Date() },
     });
+
+    // Reset unseen counter to 0 for current user in this conversation (if model exists)
+    const pAny2 = prisma as any
+    if (pAny2?.unseenCounter?.upsert) {
+      await pAny2.unseenCounter.upsert({
+        where: { conversationId_userId: { conversationId: convo.id, userId: currentUserId } },
+        update: { count: 0 },
+        create: { conversationId: convo.id, userId: currentUserId, count: 0 },
+      })
+    }
     // Notify sender that their messages were seen
     const io = getIO();
     io?.to(otherUserId).emit("message:seen", {

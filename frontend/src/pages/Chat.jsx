@@ -16,6 +16,15 @@ export default function Chat(){
   const [loading, setLoading] = useState(true)
   const [unreadCounts, setUnreadCounts] = useState({}) // { [userId]: number }
 
+function buildUnreadFromConvos(convos){
+  const out = {}
+  ;(convos || []).forEach((c) => {
+    const otherId = c?.otherUser?.id
+    if(otherId){ out[otherId] = c?.unseenCount || 0 }
+  })
+  return out
+}
+
 function getMessageKey(m){
   if(!m) return 'nil'
   if(m.id) return `id:${m.id}`
@@ -53,6 +62,7 @@ function getMessageKey(m){
         ])
         setMe(meData)
         setConversations(convos || [])
+        setUnreadCounts(buildUnreadFromConvos(convos))
       } finally { setLoading(false) }
 
       const s = getSocket()
@@ -74,20 +84,18 @@ function getMessageKey(m){
         } else {
           const convos = await listConversations();
           setConversations(convos || [])
-          // If the new message is to me and the thread isn't open, bump unread count
-          if (currentMe && message.receiverId === currentMe.id) {
-            const fromId = message.senderId
-            setUnreadCounts(prev => ({ ...prev, [fromId]: (prev[fromId] || 0) + 1 }))
-          }
+          setUnreadCounts(buildUnreadFromConvos(convos))
         }
       }))
       unsub.push(onUserOnline(async () => {
         const convos = await listConversations();
         setConversations(convos || [])
+        setUnreadCounts(buildUnreadFromConvos(convos))
       }))
       unsub.push(onUserOffline(async () => {
         const convos = await listConversations();
         setConversations(convos || [])
+        setUnreadCounts(buildUnreadFromConvos(convos))
       }))
     })()
 
