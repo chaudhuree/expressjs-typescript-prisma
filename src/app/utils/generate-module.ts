@@ -15,6 +15,7 @@ if (!modelName) {
 }
 
 const baseDir = path.join(__dirname, '..', 'modules', modelName.toLowerCase());
+const prismaSchemaPath = path.join(__dirname, '..', '..', '..', 'prisma', 'schema.prisma');
 
 // Create the module directory
 if (!fs.existsSync(baseDir)) {
@@ -42,7 +43,6 @@ import httpStatus from 'http-status';
 import catchAsync from '../../utils/catchAsync';
 import sendResponse from '../../utils/sendResponse';
 import { ${capitalize(modelName)}Service } from './${modelName}.service';
-import pick from '../../utils/pickValidFields';
 
 const create = catchAsync(async (req, res) => {
   const result = await ${capitalize(modelName)}Service.create(req.body);
@@ -54,8 +54,7 @@ const create = catchAsync(async (req, res) => {
 });
 
 const getAll = catchAsync(async (req, res) => {
-  const filters = pick(req.query, ['searchTerm', 'page', 'limit']);
-  const result = await ${capitalize(modelName)}Service.getAll(filters);
+  const result = await ${capitalize(modelName)}Service.getAll(req.query);
   sendResponse(res, {
     statusCode: httpStatus.OK,
     message: '${capitalize(modelName)}s retrieved successfully',
@@ -100,14 +99,10 @@ export const ${capitalize(modelName)}Controller = {
 };
 `;
 
-// Service template
-// Service template
+// Service template using QueryBuilder
 const serviceTemplate = `
-import { Prisma } from '@prisma/client';
 import prisma from '../../utils/prisma';
-import { IFilters } from './${modelName}.interface';
-import { IPaginationOptions } from '../../interface/pagination.type';
-import { calculatePagination } from '../../utils/calculatePagination';
+import QueryBuilder from '../../builder/QueryBuilder';
 import { ${modelName}SearchableFields } from './${modelName}.constant';
 
 const create = async (data: any) => {
@@ -117,45 +112,20 @@ const create = async (data: any) => {
   return result;
 };
 
-const getAll = async (filters: IFilters) => {
-  const { page, limit, searchTerm } = filters;
-  const { skip, limit: limitData } = calculatePagination({ page, limit } as IPaginationOptions);
-
-  const andConditions = [];
-
-  if (searchTerm) {
-    andConditions.push({
-      OR: ${modelName}SearchableFields.map((field) => ({
-        [field]: {
-          contains: searchTerm,
-          mode: 'insensitive',
-        },
-      })),
-    });
-  }
-
-  const whereConditions: Prisma.${capitalize(modelName)}WhereInput =
-    andConditions.length > 0 ? { AND: andConditions } : {};
-
-  const result = await prisma.${modelName.toLowerCase()}.findMany({
-    skip,
-    take: limitData,
-    where: whereConditions,
-    orderBy: {
-      createdAt: 'desc',
-    },
-  });
-
-  const total = await prisma.${modelName.toLowerCase()}.count({
-    where: whereConditions,
-  });
+const getAll = async (query: Record<string, unknown>) => {
+  const ${modelName.toLowerCase()}Query = new QueryBuilder(prisma.${modelName.toLowerCase()}, query);
+  
+  const result = await ${modelName.toLowerCase()}Query
+    .search(${modelName}SearchableFields)
+    .filter()
+    .sort()
+    .paginate()
+    .execute();
+  
+  const meta = await ${modelName.toLowerCase()}Query.countTotal();
 
   return {
-    meta: {
-      page: Number(page) || 1,
-      limit: Number(limit) || 10,
-      total,
-    },
+    meta,
     data: result,
   };
 };
@@ -252,6 +222,7 @@ export const ${capitalize(modelName)}Validation = {
 const constantTemplate = `
 export const ${modelName}SearchableFields = [
   'id',
+  'name'
   // Add other searchable fields here
 ];
 
@@ -260,6 +231,25 @@ export const ${modelName}FilterableFields = [
   'page',
   'limit',
 ];
+
+export const ${modelName}ModelFields=[
+'id',
+'name',
+'createdAt',
+'updatedAt',
+]
+`;
+
+// Prisma schema template for the new model
+const prismaModelTemplate = `
+model ${capitalize(modelName)} {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("${modelName.toLowerCase()}s")
+}
 `;
 
 // Write files
@@ -269,6 +259,22 @@ fs.writeFileSync(path.join(baseDir, `${modelName}.service.ts`), serviceTemplate)
 fs.writeFileSync(path.join(baseDir, `${modelName}.routes.ts`), routesTemplate);
 fs.writeFileSync(path.join(baseDir, `${modelName}.validation.ts`), validationTemplate);
 fs.writeFileSync(path.join(baseDir, `${modelName}.constant.ts`), constantTemplate);
+
+// Add Prisma model to schema.prisma
+if (fs.existsSync(prismaSchemaPath)) {
+  const prismaSchemaContent = fs.readFileSync(prismaSchemaPath, 'utf-8');
+  
+  // Check if model already exists
+  const modelRegex = new RegExp(`model\\s+${capitalize(modelName)}\\s*\\{`, 'i');
+  if (!modelRegex.test(prismaSchemaContent)) {
+    fs.appendFileSync(prismaSchemaPath, prismaModelTemplate);
+    console.log(`✅ Added ${capitalize(modelName)} model to prisma/schema.prisma`);
+  } else {
+    console.log(`⚠️ Model ${capitalize(modelName)} already exists in prisma/schema.prisma`);
+  }
+} else {
+  console.log(`⚠️ prisma/schema.prisma not found. Please add the model manually.`);
+}
 
 // Add route to index.ts
 const routesIndexPath = path.join(__dirname, '..', 'routes', 'index.ts');

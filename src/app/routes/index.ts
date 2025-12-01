@@ -33,7 +33,7 @@ const moduleRoutes: ModuleRoute[] = [
   {
     path: '/logs',
     route: LogRoutes,
-  }
+  },
 ];
 
 moduleRoutes.forEach(route => router.use(route.path, route.route));
