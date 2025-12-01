@@ -14,13 +14,13 @@ const registerUser = catchAsync(async (req, res) => {
 });
 
 const getAllUsers = catchAsync(async (req, res) => {
-  const search = (req.query.search as string | undefined) || undefined;
-  const result = await UserServices.getAllUsersFromDB(search);
+  const result = await UserServices.getAllUsersFromDB(req.query);
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
-    message: 'Users Retrieve successfully',
-    data: result,
+    message: 'Users retrieved successfully',
+    meta: result.meta,
+    data: result.data,
   });
 });
 

@@ -1,8 +1,10 @@
-import { User, Prisma } from '@prisma/client';
+import { User } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import prisma from '../../utils/prisma';
 import AppError from '../../errors/AppError';
 import httpStatus from 'http-status';
+import QueryBuilder from '../../builder/QueryBuilder';
+import { userSearchableFields, userModelFields } from './user.constant';
 
 interface UserWithOptionalPassword extends Omit<User, 'password'> {
   password?: string;
@@ -56,36 +58,23 @@ const registerUserIntoDB = async (payload: any) => {
   return user;
 };
 
-const getAllUsersFromDB = async (search?: string) => {
-  const where: Prisma.UserWhereInput = search && search.trim().length
-    ? {
-        OR: [
-          { firstName: { contains: search, mode: Prisma.QueryMode.insensitive } },
-          { lastName: { contains: search, mode: Prisma.QueryMode.insensitive } },
-          { email: { contains: search, mode: Prisma.QueryMode.insensitive } },
-        ],
-      }
-    : {};
+const getAllUsersFromDB = async (query: Record<string, unknown>) => {
+  const userQuery = new QueryBuilder(prisma.user, query);
 
-  const result = await prisma.user.findMany({
-    where,
-    select: {
-      id: true,
-      firstName: true,
-      lastName: true,
-      email: true,
-      role: true,
-      status: true,
-      isOnline: true,
-      lastSeen: true,
-      createdAt: true,
-      updatedAt: true,
-    },
-    orderBy: { createdAt: 'desc' },
-    take: 50,
-  });
+  const result = await userQuery
+    .search(userSearchableFields)
+    .filter()
+    .sort()
+    .paginate()
+    .fields(userModelFields)
+    .execute();
 
-  return result;
+  const meta = await userQuery.countTotal();
+
+  return {
+    meta,
+    data: result,
+  };
 };
 
 const getMyProfileFromDB = async (id: string) => {

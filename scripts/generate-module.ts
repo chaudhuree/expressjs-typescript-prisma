@@ -279,7 +279,8 @@ if (fs.existsSync(prismaSchemaPath)) {
 }
 
 // Add route to index.ts
-const routesIndexPath = path.join(__dirname, '..', 'routes', 'index.ts');
+// const routesIndexPath = path.join(__dirname, '..', 'routes', 'index.ts');
+const routesIndexPath = path.join(__dirname, '..','src','app', 'routes', 'index.ts');
 const routesIndexContent = fs.readFileSync(routesIndexPath, 'utf-8');
 
 // Import statement to add

@@ -23,6 +23,13 @@ interface PostmanBody {
   }>;
 }
 
+interface PostmanQueryParam {
+  key: string;
+  value: string;
+  description?: string;
+  disabled?: boolean;
+}
+
 interface PostmanRequest {
   method: string;
   header: PostmanHeader[];
@@ -31,6 +38,7 @@ interface PostmanRequest {
     raw: string;
     host: string[];
     path: string[];
+    query?: PostmanQueryParam[];
     variable?: Array<{
       key: string;
       value: string;
@@ -342,6 +350,45 @@ function createPostmanItem(
   // Add path variables if any
   if (pathVariables.length > 0) {
     request.url.variable = pathVariables;
+  }
+
+  // Add query params for GET routes that are "getAll" (no path params like :id)
+  const isGetAllRoute = route.method === 'GET' && !route.path.includes(':');
+  if (isGetAllRoute) {
+    const queryParams: PostmanQueryParam[] = [
+      {
+        key: 'searchTerm',
+        value: '',
+        description: 'Search term for text search across searchable fields',
+        disabled: true,
+      },
+      {
+        key: 'page',
+        value: '1',
+        description: 'Page number for pagination',
+        disabled: true,
+      },
+      {
+        key: 'limit',
+        value: '10',
+        description: 'Number of items per page',
+        disabled: true,
+      },
+      {
+        key: 'sort',
+        value: '-createdAt',
+        description: 'Sort field (prefix with - for descending)',
+        disabled: true,
+      },
+      {
+        key: 'fields',
+        value: '',
+        description: 'Fields to include (comma-separated) or exclude (prefix with -)',
+        disabled: true,
+      },
+    ];
+    request.url.query = queryParams;
+    request.url.raw = `{{baseUrl}}${fullPath}?searchTerm=&page=1&limit=10&sort=-createdAt&fields=`;
   }
 
   // Add auth header if route requires authentication
