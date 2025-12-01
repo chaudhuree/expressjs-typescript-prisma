@@ -14,9 +14,7 @@ if (!modelName) {
   process.exit(1);
 }
 
-// const baseDir = path.join(__dirname, '..', 'modules', modelName.toLowerCase());
 const baseDir = path.join(__dirname, '..', 'src', 'app', 'modules', modelName.toLowerCase());
-// const prismaSchemaPath = path.join(__dirname, '..', '..', '..', 'prisma', 'schema.prisma');
 const prismaSchemaPath = path.join(__dirname, '..', 'prisma', 'schema.prisma');
 
 // Create the module directory
@@ -279,7 +277,6 @@ if (fs.existsSync(prismaSchemaPath)) {
 }
 
 // Add route to index.ts
-// const routesIndexPath = path.join(__dirname, '..', 'routes', 'index.ts');
 const routesIndexPath = path.join(__dirname, '..','src','app', 'routes', 'index.ts');
 const routesIndexContent = fs.readFileSync(routesIndexPath, 'utf-8');
 
