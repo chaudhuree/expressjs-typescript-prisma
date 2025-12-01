@@ -111,7 +111,7 @@ function getMessageKey(m){
   useEffect(() => {
     const t = setTimeout(async () => {
       if(search && search.trim().length){
-        const list = await fetchUsers({ search })
+        const list = await fetchUsers({ searchTerm: search })
         setUsers(list || [])
       } else {
         setUsers([])
